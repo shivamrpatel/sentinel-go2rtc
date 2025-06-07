@@ -1,200 +1,178 @@
-// main menu
-document.body.innerHTML = `
-<style>
-ul {
-    list-style: none;
-    margin: 0 auto;
-}
+console.log("main.js loaded.") // Diagnostic log
 
-a {
-    text-decoration: none;
-    font-family: 'Lora', serif;
-    transition: .5s linear;
-}
+window.appState = function appState() {
+  // Explicitly make global
+  console.log("appState function defined.") // Diagnostic log
+  return {
+    streams: [],
+    selectedStreams: {},
+    modes: {
+      webrtc: true,
+      mse: true,
+      hls: true,
+      mjpeg: true,
+    },
+    selectAll: false,
+    versionInfo: "Loading...",
+    configPathInfo: "Loading...",
+    initialLoading: true,
+    isDarkMode: document.documentElement.classList.contains("dark"), // Sync with initial state
+    init() {
+      console.log("appState.init() called.") // Diagnostic log
+      // Dark mode is initialized by inline script, this just sets Alpine's reactive property
+      this.isDarkMode = document.documentElement.classList.contains("dark")
 
-i {
-    margin-right: 10px;
-}
+      this.fetchInfo()
+      this.reloadStreams().then(() => {
+        this.initialLoading = false
+      })
+      setInterval(() => this.reloadStreams(), 2000)
 
-nav {
-    display: block;
-    margin: 0 auto 10px;
-}
-
-nav ul {
-    padding: 1em 0;
-    background: #ECDAD6;
-}
-
-nav a {
-    padding: 1em;
-    background: rgba(177, 152, 145, .3);
-    border-right: 1px solid #b19891;
-    color: #695753;
-}
-
-nav a:hover {
-    background: #b19891;
-}
-
-nav li {
-    display: inline;
-}
-
-body {
-    font-family: Arial, Helvetica, sans-serif;
-    background-color: white;
-}
-table {
-    background-color: white;
-    text-align: left;
-    border-collapse: collapse;
-}
-table thead {
-    background: #CFCFCF;
-    background: linear-gradient(to bottom, #dbdbdb 0%, #d3d3d3 66%, #CFCFCF 100%);
-    border-bottom: 3px solid black;
-}
-table thead th {
-    font-size: 15px;
-    font-weight: bold;
-    color: black;
-    text-align: center;
-}
-table td, table th {
-    border: 1px solid black;
-    padding: 5px 5px;
-}
-
-/* Dark mode styles */
-body.dark-mode {
-    background-color: #121212;
-    color: #e0e0e0;
-}
-
-body.dark-mode nav ul {
-    background: #333;
-}
-
-body.dark-mode a {
-    background: rgba(45, 45, 45, .8);
-    border-right: 1px solid #2c2c2c;
-    color: #c7c7c7;
-}
-
-body.dark-mode a:hover {
-    background: #555;
-}
-
-body.dark-mode a:visited {
-    color: #999;
-}
-
-body.dark-mode table {
-    background-color: #222;
-    color: #ddd;
-}
-
-body.dark-mode table thead {
-    background: linear-gradient(to bottom, #444 0%, #3d3d3d 66%, #333 100%);
-    border-bottom: 3px solid #888;
-}
-body.dark-mode table thead th {
-    font-size: 15px;
-    font-weight: bold;
-    color: #ddd;
-    text-align: center;
-}
-body.dark-mode table td, body.dark-mode table th {
-    border: 1px solid #444;
-}
-
-body.dark-mode button {
-    background: rgba(255, 255, 255, .1);
-    border: 1px solid #444;
-    color: #ccc;
-}
-
-body.dark-mode input, 
-body.dark-mode select, 
-body.dark-mode textarea {
-    background-color: #333;
-    color: #e0e0e0;
-    border: 1px solid #444;
-}
-
-body.dark-mode input::placeholder,
-body.dark-mode textarea::placeholder {
-    color: #bbb;
-}
-
-body.dark-mode hr {
-    border-top: 1px solid #444;
-}
-</style>
-<nav>
-    <ul>
-        <li><a href="index.html">Streams</a></li>
-        <li><a href="add.html">Add</a></li>
-        <li><a href="editor.html">Config</a></li>
-        <li><a href="log.html">Log</a></li>
-        <li><a href="network.html">Net</a></li>
-       <li><a href="#" id="darkModeToggle">
-       &#127769;
-        </a>
-        </li>
-    </ul>
-</nav>
-` + document.body.innerHTML;
-
-const sunIcon = '&#9728;&#65039;';
-const moonIcon = '&#127765;';
-
-document.addEventListener('DOMContentLoaded', () => {
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const isDarkModeEnabled = () => document.body.classList.contains('dark-mode');
-
-    // Update the toggle button based on the dark mode state
-    const updateToggleButton = () => {
-        if (isDarkModeEnabled()) {
-            darkModeToggle.innerHTML = sunIcon;
-            darkModeToggle.setAttribute('aria-label', 'Enable light mode');
-        } else {
-            darkModeToggle.innerHTML = moonIcon;
-            darkModeToggle.setAttribute('aria-label', 'Enable dark mode');
+      // Listen for system dark mode changes to update Alpine state if no user override
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+        if (localStorage.getItem("darkMode") === null) {
+          this.isDarkMode = e.matches
+          if (this.isDarkMode) {
+            document.documentElement.classList.add("dark")
+          } else {
+            document.documentElement.classList.remove("dark")
+          }
         }
-    };
-
-    const updateDarkMode = () => {
-        if (localStorage.getItem('darkMode') === 'enabled' || prefersDarkScheme.matches && localStorage.getItem('darkMode') !== 'disabled') {
-            document.body.classList.add('dark-mode');
-        } else {
-            document.body.classList.remove('dark-mode');
+      })
+    },
+    toggleDarkMode() {
+      this.isDarkMode = !this.isDarkMode
+      if (this.isDarkMode) {
+        document.documentElement.classList.add("dark")
+        localStorage.setItem("darkMode", "enabled")
+      } else {
+        document.documentElement.classList.remove("dark")
+        localStorage.setItem("darkMode", "disabled")
+      }
+    },
+    fetchInfo() {
+      const url = new URL("api", location.href)
+      fetch(url, { cache: "no-cache" })
+        .then((r) => (r.ok ? r.json() : Promise.reject(`API error: ${r.status}`)))
+        .then((data) => {
+          this.versionInfo = data.version || "N/A"
+          this.configPathInfo = data.config_path || "N/A"
+        })
+        .catch((error) => {
+          console.error("Error fetching API info:", error)
+          this.versionInfo = "Error"
+          this.configPathInfo = "Error"
+        })
+    },
+    async reloadStreams() {
+      const url = new URL("api/streams", location.href)
+      try {
+        const response = await fetch(url, { cache: "no-cache" })
+        if (!response.ok) {
+          console.error("Error fetching streams:", response.status)
+          return
         }
-        updateEditorTheme();
-        updateToggleButton();
-    };
+        const data = await response.json()
 
-    // Update the editor theme based on the dark mode state
-    const updateEditorTheme = () => {
-        if (typeof editor !== 'undefined') {
-            editor.setTheme(isDarkModeEnabled() ? 'ace/theme/tomorrow_night_eighties' : 'ace/theme/github');
+        const newStreamsData = []
+        const currentSelectedStates = { ...this.selectedStreams }
+
+        for (const [key, value] of Object.entries(data)) {
+          const name = key.replace(/[<">]/g, "")
+          const online = value && value.consumers ? value.consumers.length : 0
+          const src = encodeURIComponent(name)
+
+          newStreamsData.push({
+            id: name,
+            name: name,
+            online: online,
+            src: src,
+            infoLink: `api/streams?src=${src}`,
+            probeLink: `api/streams?src=${src}&video=all&audio=all&microphone`,
+            netLink: `network.html?src=${src}`,
+            checked: currentSelectedStates[name] || false,
+          })
+          if (typeof this.selectedStreams[name] === "undefined") {
+            this.selectedStreams[name] = false
+          }
         }
-    };
+        this.streams = newStreamsData
+        this.updateSelectAllCheckboxState()
+      } catch (error) {
+        console.error("Error reloading streams:", error)
+      }
+    },
+    toggleSelectAll(isChecked) {
+      this.selectAll = isChecked
+      this.streams.forEach((stream) => {
+        stream.checked = this.selectAll
+        this.selectedStreams[stream.name] = this.selectAll
+      })
+    },
+    updateStreamSelection(streamName) {
+      const stream = this.streams.find((s) => s.name === streamName)
+      if (stream) {
+        this.selectedStreams[streamName] = stream.checked
+      }
+      this.updateSelectAllCheckboxState()
+    },
+    updateSelectAllCheckboxState() {
+      if (this.streams.length === 0) {
+        this.selectAll = false
+      } else {
+        this.selectAll = this.streams.every((s) => s.checked)
+      }
+    },
+    handleStreamButtonClick() {
+      const url = new URL("stream.html", location.href)
+      let hasSelection = false
+      this.streams.forEach((stream) => {
+        if (this.selectedStreams[stream.name]) {
+          url.searchParams.append("src", stream.name)
+          hasSelection = true
+        }
+      })
 
-    // Initial update for dark mode and toggle button
-    updateDarkMode();
+      if (!hasSelection) {
+        alert("Please select at least one stream.")
+        return
+      }
 
-    // Listen for changes in the system's color scheme preference
-    prefersDarkScheme.addEventListener('change', updateDarkMode); // Modern approach
+      const selectedModes = Object.entries(this.modes)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([modeName, _]) => modeName)
+        .join(",")
 
-    // Toggle dark mode and update local storage on button click
-    darkModeToggle.addEventListener('click', () => {
-        const enabled = document.body.classList.toggle('dark-mode');
-        localStorage.setItem('darkMode', enabled ? 'enabled' : 'disabled');
-        updateToggleButton(); // Update the button after toggling
-        updateEditorTheme();
-    });
-});
+      if (!selectedModes) {
+        alert("Please select at least one stream mode.")
+        return
+      }
+      window.location.href = `${url}&mode=${selectedModes}`
+    },
+    async deleteStream(encodedName) {
+      const src = decodeURIComponent(encodedName)
+      const message = `Please type the name of the stream "${src}" to confirm its deletion from the configuration. This action is irreversible.`
+
+      if (prompt(message) !== src) {
+        alert("Stream name does not match. Deletion cancelled.")
+        return
+      }
+
+      const deleteUrl = new URL("api/streams", location.href)
+      deleteUrl.searchParams.set("src", src)
+
+      try {
+        const response = await fetch(deleteUrl, { method: "DELETE" })
+        if (!response.ok) {
+          throw new Error(`Failed to delete: ${response.status}`)
+        }
+        this.streams = this.streams.filter((s) => s.name !== src)
+        delete this.selectedStreams[src]
+        this.updateSelectAllCheckboxState()
+      } catch (error) {
+        console.error("Failed to delete the stream:", error)
+        alert(`Failed to delete stream "${src}". See console for details.`)
+      }
+    },
+  }
+}

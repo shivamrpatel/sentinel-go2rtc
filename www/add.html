@@ -1,381 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <title>go2rtc - Add Stream</title>
-    <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1, maximum-scale=1">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel - Add Stream</title>
+    <link rel="apple-touch-icon" href="https://alexxit.github.io/go2rtc/icons/apple-touch-icon-180x180.png"
+        sizes="180x180">
+    <link rel="icon" href="https://alexxit.github.io/go2rtc/icons/favicon.ico">
+    <link rel="manifest" href="https://alexxit.github.io/go2rtc/manifest.json">
 
-        html, body {
-            width: 100%;
-            height: 100%;
-        }
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <!-- <link href="https://cdn.jsdelivr.net/npm/preline@3.1.0/src/plugins/accordion/variants.min.css" rel="stylesheet"> -->
 
-        .module {
-            display: none;
-            padding: 10px;
-        }
+    <link rel="stylesheet" href="styles.css">
 
-
-        table tbody td {
-            font-size: 13px;
-        }
-
-    </style>
-</head>
-<body>
-<script src="main.js"></script>
-<script>
-    function drawTable(table, data) {
-        const cols = ['id', 'name', 'info', 'url', 'location'];
-        const th = (row) => cols.reduce((html, k) => k in row ? `${html}<th>${k}</th>` : html, '<tr>') + '</tr>';
-        const td = (row) => cols.reduce((html, k) => k in row ? `${html}<td style="word-break: break-word;white-space: normal;">${row[k]}</td>` : html, '<tr>') + '</tr>';
-
-        const thead = th(data.sources[0]);
-        const tbody = data.sources.reduce((html, source) => `${html}${td(source)}`, '');
-
-        table.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
-    }
-
-    async function getSources(tableID, url) {
-        const table = document.getElementById(tableID);
-        table.innerText = 'loading...';
-
-        const r = typeof url === 'string' ? await fetch(url, {cache: 'no-cache'}) : url;
-        if (!r.ok) {
-            table.innerText = await r.text();
-            return;
-        }
-
-        drawTable(table, await r.json());
-    }
-</script>
-
-
-<button id="stream">Temporary stream</button>
-<div class="module">
-    <form id="stream-form" style="padding: 10px">
-        <input type="text" name="name" placeholder="name">
-        <input type="text" name="src" placeholder="url">
-        <input type="submit" value="add">
-    </form>
-</div>
-<script>
-    document.getElementById('stream').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-    });
-
-    document.getElementById('stream-form').addEventListener('submit', async ev => {
-        ev.preventDefault();
-
-        const url = new URL('api/streams', location.href);
-        url.searchParams.set('name', ev.target.elements['name'].value);
-        url.searchParams.set('src', ev.target.elements['src'].value);
-
-        const r = await fetch(url, {method: 'PUT'});
-        alert(r.ok ? 'OK' : 'ERROR: ' + await r.text());
-    });
-</script>
-
-
-<button id="alsa">ALSA (Linux audio)</button>
-<div class="module">
-    <table id="alsa-table"></table>
-</div>
-<script>
-    document.getElementById('alsa').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('alsa-table', 'api/alsa');
-    });
-</script>
-
-
-<button id="homekit">Apple HomeKit</button>
-<div class="module">
-    <form id="homekit-pair" style="margin-bottom: 10px">
-        <input type="text" name="id" placeholder="stream id" size="20">
-        <input type="text" name="url" placeholder="url" size="40">
-        <input type="text" name="pin" placeholder="pin" size="10">
-        <input type="submit" value="Pair">
-    </form>
-    <form id="homekit-unpair" style="margin-bottom: 10px">
-        <input type="text" name="id" placeholder="stream id" size="20">
-        <input type="submit" value="Unpair">
-    </form>
-    <table id="homekit-table"></table>
-</div>
-<script>
-    async function reloadHomeKit() {
-        await getSources('homekit-table', 'api/homekit');
-
-        const rows = document.querySelectorAll('#homekit-table tr');
-        rows.forEach((row, i) => {
-            let commands = '';
-            if (row.children[2].innerText.indexOf('status=1') > 0) {
-                commands += '<a href="#">pair</a>';
-            } else if (i > 0 && row.children[3].innerText) {
-                commands += '<a href="#">unpair</a>';
+    <script>
+        // FOUC Mitigation & Tailwind Config
+        (function () {
+            const storedPreference = localStorage.getItem('darkMode');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (storedPreference === 'enabled' || (!storedPreference && systemPrefersDark)) {
+                document.documentElement.classList.add('dark');
             }
-            row.innerHTML += `<td>${commands}</td>`;
-        });
-    }
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            'sentinel-accent': '#020817',
+                        }
+                    }
+                },
+            }
+        })();
+    </script>
 
-    document.getElementById('homekit').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await reloadHomeKit();
-    });
+</head>
 
-    document.getElementById('homekit-table').addEventListener('click', ev => {
-        if (ev.target.innerText === 'pair') {
-            const form = document.querySelector('#homekit-pair');
-            const row = ev.target.closest('tr');
-            form.children[0].value = row.children[0].innerText;
-            form.children[1].value = row.children[2].innerText;
-        } else if (ev.target.innerText === 'unpair') {
-            const form = document.querySelector('#homekit-unpair');
-            const row = ev.target.closest('tr');
-            form.children[0].value = row.children[3].innerText;
-        }
-    });
+<body class="bg-gray-100 text-gray-900 dark:bg-slate-900 dark:text-gray-100 font-sans transition-colors duration-300"
+    x-data="appState()" x-init="init()" x-cloak>
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-72 bg-sentinel-accent text-white p-4 flex flex-col flex-shrink-0 hs-accordion-group">
+            <div class="text-3xl font-bold text-center text-gray-100 py-4 mb-2">
+                Sentinel
+            </div>
+            <nav class="flex-grow space-y-1.5">
+                <a href="index.html"
+                    class="hs-accordion-toggle flex items-center gap-x-3.5 py-2.5 px-3 text-sm text-slate-300 rounded-lg hover:bg-slate-700/70 hover:text-gray-100">
+                    <svg class="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                    Streams
+                </a>
+                <a href="add.html"
+                    class="hs-accordion-toggle flex items-center gap-x-3.5 py-2.5 px-3 text-sm text-gray-100 rounded-lg hover:bg-slate-700/70 bg-slate-700/40 font-medium">
+                    <svg class="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="M12 5v14" />
+                    </svg>
+                    Add Stream
+                </a>
+                <a href="editor.html"
+                    class="hs-accordion-toggle flex items-center gap-x-3.5 py-2.5 px-3 text-sm text-slate-300 rounded-lg hover:bg-slate-700/70 hover:text-gray-100">
+                    <svg class="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                    </svg>
+                    Config Editor
+                </a>
+                <a href="log.html"
+                    class="hs-accordion-toggle flex items-center gap-x-3.5 py-2.5 px-3 text-sm text-slate-300 rounded-lg hover:bg-slate-700/70 hover:text-gray-100">
+                    <svg class="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <rect width="10" height="18" x="7" y="3" rx="2" />
+                        <path d="M10 9.5c-2-.3-4.5-1-4.5-3.5C5.5 4 7 3 7 3S9 3 9 4c0 .9-.5 1.4-1 1.8" />
+                        <path d="M14 9.5c2-.3 4.5-1 4.5-3.5C18.5 4 17 3 17 3s-2 0-2 1c0 .9.5 1.4 1 1.8" />
+                        <path d="M7 15a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2.5H7Z" />
+                    </svg>
+                    View Log
+                </a>
+                <a href="network.html"
+                    class="hs-accordion-toggle flex items-center gap-x-3.5 py-2.5 px-3 text-sm text-slate-300 rounded-lg hover:bg-slate-700/70 hover:text-gray-100">
+                    <svg class="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M2 13a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2Z" />
+                        <path d="M5 13V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6" />
+                        <path d="M12 13v4" />
+                        <path d="M12 5v-2M12 21v-2M20 13h2M2 13H0M7 13h0M17 13h0" />
+                    </svg>
+                    Network Info
+                </a>
+            </nav>
+            <div class="mt-auto pt-4 border-t border-slate-700">
+                <button @click="toggleDarkMode()"
+                    class="w-full flex items-center justify-center gap-x-2 py-2.5 px-3 text-sm text-slate-300 rounded-lg hover:bg-slate-700/70 hover:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-600">
+                    <span x-html="isDarkMode ? '&#9728;&#65039;' : '&#127765;'"></span>
+                    <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
+                </button>
+            </div>
+        </aside>
 
-    document.getElementById('homekit-pair').addEventListener('submit', async ev => {
-        ev.preventDefault();
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden" x-data="addStreamState()">
+            <div
+                class="bg-white dark:bg-slate-800/70 shadow-sm py-3 px-4 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-slate-700">
+                <h1 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">Add New Stream Source</h1>
+            </div>
 
-        const body = new FormData(ev.target);
-        body.set('url', body.get('url') + '&pin=' + body.get('pin'));
-        body.delete('pin');
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Source Type Navigation -->
+                <div
+                    class="w-1/4 bg-white dark:bg-slate-800/70 border-r border-gray-200 dark:border-slate-700 p-4 overflow-y-auto">
+                    <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                        Source Types</h2>
+                    <nav class="flex flex-col space-y-1">
+                        <template x-for="source in sources" :key="source.id">
+                            <button @click="setActiveSource(source.id)"
+                                :class="{ 'bg-blue-500 text-white font-semibold shadow-sm': activeSource === source.id, 'hover:bg-slate-200 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100': activeSource !== source.id }"
+                                class="w-full text-left py-2 px-3 rounded-lg text-sm transition-colors duration-150">
+                                <span x-text="source.name"></span>
+                            </button>
+                        </template>
+                    </nav>
+                </div>
 
-        const r = await fetch('api/homekit', {method: 'POST', body: body});
-        alert(r.ok ? 'OK' : 'ERROR: ' + await r.text());
+                <!-- Source Configuration Area -->
+                <div class="w-3/4 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+                    <div class="max-w-4xl mx-auto relative min-h-96">
+                        <!-- Generic Stream Form -->
+                        <div x-show="activeSource === 'stream'" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0" class="absolute inset-0">
+                            <div
+                                class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Add Temporary
+                                    Stream</h3>
+                                <form @submit.prevent="addTemporaryStream" class="space-y-4">
+                                    <div>
+                                        <label for="stream-name"
+                                            class="block text-sm font-medium mb-2 dark:text-white">Stream Name</label>
+                                        <input type="text" id="stream-name" x-model="forms.stream.name"
+                                            placeholder="e.g., front-door-cam"
+                                            class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:text-gray-300 dark:focus:ring-gray-600">
+                                    </div>
+                                    <div>
+                                        <label for="stream-url"
+                                            class="block text-sm font-medium mb-2 dark:text-white">Source URL</label>
+                                        <input type="text" id="stream-url" x-model="forms.stream.src"
+                                            placeholder="rtsp://..."
+                                            class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:text-gray-300 dark:focus:ring-gray-600">
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">Add
+                                            Stream</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
 
-        await reloadHomeKit();
-    });
+                        <!-- ONVIF Form & Table -->
+                        <div x-show="activeSource === 'onvif'" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0" class="absolute inset-0">
+                            <div
+                                class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Discover ONVIF
+                                    Devices</h3>
+                                <form @submit.prevent="discoverOnvif" class="space-y-4 mb-6">
+                                    <div>
+                                        <label for="onvif-url"
+                                            class="block text-sm font-medium mb-2 dark:text-white">Device Address
+                                            (optional)</label>
+                                        <input type="text" id="onvif-url" x-model="forms.onvif.src" placeholder="onvif://user:pass@192.168.1.123" class="py-3 px-4 block w-full border border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:text-gray-300 dark:focus:ring-gray-600">
 
-    document.getElementById('homekit-unpair').addEventListener('submit', async ev => {
-        ev.preventDefault();
-        const r = await fetch('api/homekit', {method: 'DELETE', body: new FormData(ev.target)});
-        alert(r.ok ? 'OK' : 'ERROR: ' + await r.text());
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">Discover</button>
+                                    </div>
+                                </form>
+                                <div x-html="renderTable(tables.onvif, 'onvif')"></div>
+                            </div>
+                        </div>
 
-        await reloadHomeKit();
-    });
-</script>
+                        <!-- HomeKit Form & Table -->
+                        <div x-show="activeSource === 'homekit'" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0" class="absolute inset-0">
+                            <div
+                                class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Apple HomeKit</h3>
+                                <form @submit.prevent="submitHomekitPair"
+                                    class="space-y-4 mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+                                    <h4 class="text-md font-medium text-gray-700 dark:text-gray-300">Pair Device</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">Stream
+                                                ID</label>
+                                            <input type="text" x-model="forms.homekit.pair.id" placeholder="stream id"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">URL</label>
+                                            <input type="text" x-model="forms.homekit.pair.url" placeholder="url"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">PIN</label>
+                                            <input type="text" x-model="forms.homekit.pair.pin" placeholder="pin"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700">Pair</button>
+                                    </div>
+                                </form>
+                                <form @submit.prevent="submitHomekitUnpair" class="space-y-4 mb-6">
+                                    <h4 class="text-md font-medium text-gray-700 dark:text-gray-300">Unpair Device</h4>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2 dark:text-white">Stream ID</label>
+                                        <input type="text" x-model="forms.homekit.unpair.id" placeholder="stream id"
+                                            class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-red-600 text-white hover:bg-red-700">Unpair</button>
+                                    </div>
+                                </form>
+                                <div x-html="renderTable(tables.homekit, 'homekit')"></div>
+                            </div>
+                        </div>
 
+                        <!-- Google Nest Form & Table -->
+                        <div x-show="activeSource === 'nest'" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0" class="absolute inset-0">
+                            <div
+                                class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Google Nest</h3>
+                                <form @submit.prevent="submitNestLogin" class="space-y-4 mb-6">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">Client
+                                                ID</label>
+                                            <input type="text" x-model="forms.nest.client_id"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">Client
+                                                Secret</label>
+                                            <input type="text" x-model="forms.nest.client_secret"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">Refresh
+                                                Token</label>
+                                            <input type="text" x-model="forms.nest.refresh_token"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">Project
+                                                ID</label>
+                                            <input type="text" x-model="forms.nest.project_id"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700">Login</button>
+                                    </div>
+                                </form>
+                                <div x-html="renderTable(tables.nest, 'nest')"></div>
+                            </div>
+                        </div>
 
-<button id="dvrip">DVRIP</button>
-<div class="module">
-    <table id="dvrip-table"></table>
-</div>
-<script>
-    document.getElementById('dvrip').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('dvrip-table', 'api/dvrip');
-    });
-</script>
+                        <!-- Ring Form & Table -->
+                        <div x-show="activeSource === 'ring'" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0" class="absolute inset-0">
+                            <div
+                                class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Ring</h3>
+                                <form @submit.prevent="submitRingCredentials"
+                                    class="space-y-4 mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+                                    <h4 class="text-md font-medium text-gray-700 dark:text-gray-300">Login with
+                                        Credentials</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2 dark:text-white">Email</label>
+                                            <input type="email" x-model="forms.ring.credentials.email"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium mb-2 dark:text-white">Password</label>
+                                            <input type="password" x-model="forms.ring.credentials.password"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                    </div>
+                                    <div x-show="forms.ring.show2FA" class="mt-4">
+                                        <label class="block text-sm font-medium mb-2 dark:text-white">2FA Code</label>
+                                        <input type="text" x-model="forms.ring.credentials.code"
+                                            class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        <p x-show="forms.ring.tfaPrompt" x-text="forms.ring.tfaPrompt"
+                                            class="mt-1 text-sm text-gray-500 dark:text-gray-400"></p>
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700">Login</button>
+                                    </div>
+                                </form>
+                                <form @submit.prevent="submitRingToken" class="space-y-4 mb-6">
+                                    <h4 class="text-md font-medium text-gray-700 dark:text-gray-300">Login with Refresh
+                                        Token</h4>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2 dark:text-white">Refresh
+                                            Token</label>
+                                        <input type="text" x-model="forms.ring.token.refresh_token"
+                                            class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700">Login</button>
+                                    </div>
+                                </form>
+                                <div x-html="renderTable(tables.ring, 'ring')"></div>
+                            </div>
+                        </div>
 
+                        <!-- Roborock Form & Table -->
+                        <div x-show="activeSource === 'roborock'" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0" class="absolute inset-0">
+                            <div
+                                class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Roborock</h3>
+                                <form @submit.prevent="submitRoborockLogin" class="space-y-4 mb-6">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium mb-2 dark:text-white">Username</label>
+                                            <input type="text" x-model="forms.roborock.username"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium mb-2 dark:text-white">Password</label>
+                                            <input type="password" x-model="forms.roborock.password"
+                                                class="py-3 px-4 block w-full border-gray-300 dark:border-gray-500 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:text-gray-300">
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <button type="submit"
+                                            class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700">Login</button>
+                                    </div>
+                                </form>
+                                <div x-html="renderTable(tables.roborock, 'roborock')"></div>
+                            </div>
+                        </div>
 
-<button id="devices">FFmpeg Devices (USB)</button>
-<div class="module">
-    <table id="devices-table"></table>
-</div>
-<script>
-    document.getElementById('devices').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('devices-table', 'api/ffmpeg/devices');
-    });
-</script>
+                        <!-- Other simple source types -->
+                        <template
+                            x-for="source in sources.filter(s => !['stream', 'onvif', 'homekit', 'nest', 'ring', 'roborock'].includes(s.id))"
+                            :key="source.id">
+                            <div x-show="activeSource === source.id"
+                                x-transition:enter="transition ease-out duration-200"
+                                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                x-transition:leave="transition ease-in duration-150"
+                                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                                class="absolute inset-0">
+                                <div
+                                    class="bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700">
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4"
+                                        x-text="`Available ${source.name} Sources`"></h3>
+                                    <div x-html="renderTable(tables[source.id], source.id)"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
 
-
-<button id="hardware">FFmpeg Hardware</button>
-<div class="module">
-    <table id="hardware-table"></table>
-</div>
-<script>
-    document.getElementById('hardware').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('hardware-table', 'api/ffmpeg/hardware');
-    });
-</script>
-
-
-<button id="nest">Google Nest</button>
-<div class="module">
-    <form id="nest-form" style="margin-bottom: 10px">
-        <input type="text" name="client_id" placeholder="client_id">
-        <input type="text" name="client_secret" placeholder="client_secret">
-        <input type="text" name="refresh_token" placeholder="refresh_token">
-        <input type="text" name="project_id" placeholder="project_id">
-        <input type="submit" value="Login">
-    </form>
-    <table id="nest-table"></table>
-</div>
-<script>
-    document.getElementById('nest').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-    });
-
-    document.getElementById('nest-form').addEventListener('submit', async ev => {
-        ev.preventDefault();
-
-        const query = new URLSearchParams(new FormData(ev.target));
-        const url = new URL('api/nest?' + query.toString(), location.href);
-
-        const r = await fetch(url, {cache: 'no-cache'});
-        await getSources('nest-table', r);
-    });
-</script>
-
-<button id="ring">Ring</button>
-<div class="module">
-    <form id="ring-credentials-form" style="margin-bottom: 10px">
-        <input type="email" name="email" placeholder="email">
-        <input type="password" name="password" placeholder="password">
-        <div id="tfa-field" style="display: none">
-            <input type="text" name="code" placeholder="2FA code">
-            <div id="tfa-prompt"></div>
-        </div>
-        <input type="submit" value="Login">
-    </form>
-    <form id="ring-token-form" style="margin-bottom: 10px">
-        <input type="text" name="refresh_token" placeholder="refresh_token">
-        <input type="submit" value="Login">
-    </form>
-    <table id="ring-table"></table>
-</div>
-<script>
-    document.getElementById('ring').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-    });
-
-    async function handleRingAuth(ev) {
-        ev.preventDefault();
-        const query = new URLSearchParams(new FormData(ev.target));
-        const url = new URL('api/ring?' + query.toString(), location.href);
-
-        const r = await fetch(url, {cache: 'no-cache'});
-        const data = await r.json();
-
-        if (data.needs_2fa) {
-            document.getElementById('tfa-field').style.display = 'block';
-            document.getElementById('tfa-prompt').textContent = data.prompt || 'Enter 2FA code';
-            return;
-        }
-
-        if (!r.ok) {
-            const table = document.getElementById('ring-table');
-            table.innerText = data.error || 'Unknown error';
-            return;
-        }
-
-        const table = document.getElementById('ring-table');
-        drawTable(table, data);
-    }
-
-    document.getElementById('ring-credentials-form').addEventListener('submit', handleRingAuth);
-    document.getElementById('ring-token-form').addEventListener('submit', handleRingAuth);
-</script>
-
-<button id="gopro">GoPro</button>
-<div class="module">
-    <table id="gopro-table"></table>
-</div>
-<script>
-    document.getElementById('gopro').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('gopro-table', 'api/gopro');
-    });
-</script>
-
-
-<button id="hass">Home Assistant</button>
-<div class="module">
-    <table id="hass-table"></table>
-</div>
-<script>
-    document.getElementById('hass').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('hass-table', 'api/hass');
-    });
-</script>
-
-
-<button id="onvif">ONVIF</button>
-<div class="module">
-    <form id="onvif-form" style="padding: 10px">
-        <input type="text" name="src" placeholder="onvif://user:pass@192.168.1.123:80" size="50">
-        <input type="submit" value="test">
-    </form>
-    <table id="onvif-table"></table>
-</div>
-<script>
-    document.getElementById('onvif').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('onvif-table', 'api/onvif');
-    });
-
-    document.getElementById('onvif-form').addEventListener('submit', async ev => {
-        ev.preventDefault();
-
-        const url = new URL('api/onvif', location.href);
-        url.searchParams.set('src', ev.target.elements['src'].value);
-
-        await getSources('onvif-table', url.toString());
-    });
-</script>
-
-
-<button id="roborock">Roborock</button>
-<div class="module">
-    <form id="roborock-form" style="margin-bottom: 10px">
-        <input type="text" name="username" placeholder="username">
-        <input type="password" name="password" placeholder="password">
-        <input type="submit" value="Login">
-    </form>
-    <table id="roborock-table">
-    </table>
-</div>
-<script>
-    document.getElementById('roborock').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('roborock-table', 'api/roborock');
-    });
-
-    document.getElementById('roborock-form').addEventListener('submit', async ev => {
-        ev.preventDefault();
-        const r = await fetch('api/roborock', {method: 'POST', body: new FormData(ev.target)});
-        await getSources('roborock-table', r);
-    });
-</script>
-
-
-<button id="v4l2">V4L2 (Linux video)</button>
-<div class="module">
-    <table id="v4l2-table"></table>
-</div>
-<script>
-    document.getElementById('v4l2').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('v4l2-table', 'api/v4l2');
-    });
-</script>
-
-
-<button id="webtorrent">WebTorrent Shares</button>
-<div class="module">
-    <table id="webtorrent-table"></table>
-</div>
-<script>
-    document.getElementById('webtorrent').addEventListener('click', async ev => {
-        ev.target.nextElementSibling.style.display = 'block';
-        await getSources('webtorrent-table', 'api/webtorrent');
-    });
-</script>
-
-
+    <script src="main.js"></script>
+    <script src="add.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/preline@3.1.0/dist/preline.min.js"></script> -->
 </body>
+
 </html>
