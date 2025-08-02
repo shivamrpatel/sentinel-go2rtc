@@ -16,24 +16,26 @@ ENV GOARCH=${TARGETARCH}
 
 WORKDIR /build
 
-RUN apk add git
+RUN apk add git opencv-dev pkgconfig build-base
 
 # Cache dependencies
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -ldflags "-s -w" -trimpath
+RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=1 go build -ldflags "-s -w" -trimpath
 
 
 # 2. Final image
 FROM python:${PYTHON_VERSION}-alpine AS base
 
 # Install ffmpeg, tini (for signal handling),
-# and other common tools for the echo source.
+# OpenCV libraries, and other common tools for the echo source.
 # alsa-plugins-pulse for ALSA support (+0MB)
 # font-droid for FFmpeg drawtext filter (+2MB)
-RUN apk add --no-cache tini ffmpeg ffplay bash curl jq alsa-plugins-pulse font-droid
+# opencv-dev for OpenCV C++ libraries and headers
+RUN apk add --no-cache tini ffmpeg ffplay bash curl jq alsa-plugins-pulse font-droid \
+    opencv-dev pkgconfig build-base
 
 # Hardware Acceleration for Intel CPU (+50MB)
 ARG TARGETARCH

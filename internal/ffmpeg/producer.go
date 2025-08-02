@@ -59,18 +59,27 @@ func NewProducer(url string) (core.Producer, error) {
 
 func (p *Producer) Start() error {
 	var err error
-	if p.ffmpeg, err = streams.GetProducer(p.newURL()); err != nil {
+	streamURL := p.newURL()
+	log.Info().Msgf("[ffmpeg] creating stream with URL: %s", streamURL)
+
+	if p.ffmpeg, err = streams.GetProducer(streamURL); err != nil {
+		log.Error().Err(err).Msgf("[ffmpeg] failed to create producer for URL: %s", streamURL)
 		return err
 	}
+
+	log.Info().Msgf("[ffmpeg] successfully created producer for URL: %s", streamURL)
 
 	for i, media := range p.ffmpeg.GetMedias() {
 		track, err := p.ffmpeg.GetTrack(media, media.Codecs[0])
 		if err != nil {
+			log.Error().Err(err).Msgf("[ffmpeg] failed to get track for media %d", i)
 			return err
 		}
 		p.Receivers[i].Replace(track)
+		log.Info().Msgf("[ffmpeg] successfully set up track for media %d with codec: %s", i, media.Codecs[0].Name)
 	}
 
+	log.Info().Msg("[ffmpeg] starting stream")
 	return p.ffmpeg.Start()
 }
 
@@ -78,6 +87,7 @@ func (p *Producer) Stop() error {
 	if p.ffmpeg == nil {
 		return nil
 	}
+	log.Debug().Msgf("[ffmpeg] stopping process for url=%s", p.url)
 	return p.ffmpeg.Stop()
 }
 
@@ -107,6 +117,7 @@ func (p *Producer) newURL() string {
 		case core.CodecPCMU:
 			s += "#audio=pcmu/" + strconv.Itoa(int(codec.ClockRate))
 		}
+		log.Debug().Msgf("[ffmpeg] added codec: %s", codec.Name)
 	}
 	// add other params
 	for key, values := range p.query {
@@ -114,8 +125,10 @@ func (p *Producer) newURL() string {
 			for _, value := range values {
 				s += "#" + key + "=" + value
 			}
+			log.Debug().Msgf("[ffmpeg] added parameter: %s=%v", key, values)
 		}
 	}
 
+	log.Debug().Msgf("[ffmpeg] final constructed URL: %s", s)
 	return s
 }

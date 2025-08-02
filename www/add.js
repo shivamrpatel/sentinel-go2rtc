@@ -80,17 +80,17 @@ function addStreamState() {
     },
 
     async getSources(tableKey, url) {
-      this.tables[tableKey] = `<div class="flex justify-center items-center h-32">
-                                <div class="animate-spin inline-block size-6 border-[3px] border-current border-t-transparent text-blue-600 rounded-full" role="status" aria-label="loading">
+      this.tables[tableKey] = `<div class="flex justify-center items-center h-24">
+                                <div class="animate-spin inline-block size-5 border-[3px] border-current border-t-transparent text-blue-600 rounded-full" role="status" aria-label="loading">
                                     <span class="sr-only">Loading...</span>
                                 </div>
-                                <span class="ml-2 text-gray-500 dark:text-gray-400">Loading...</span>
+                                <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading...</span>
                                </div>`
       try {
         const response = typeof url === "string" ? await fetch(url, { cache: "no-cache" }) : url
         if (!response.ok) {
           this.tables[tableKey] =
-            `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">Error: ${await response.text()}</p>`
+            `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">Error: ${await response.text()}</p>`
           return
         }
         const data = await response.json()
@@ -102,61 +102,54 @@ function addStreamState() {
       } catch (error) {
         console.error(`Error fetching sources for ${tableKey}:`, error)
         this.tables[tableKey] =
-          `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">Failed to fetch data. See console for details.</p>`
+          `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">Failed to fetch data. See console for details.</p>`
       }
     },
 
     renderTable(data, sourceId = "") {
       if (typeof data === "string") {
-        return `<div class="p-4 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-400">${data}</div>`
+        return `<div class="p-3 rounded-md bg-gray-50 dark:bg-slate-800/60 text-sm text-gray-600 dark:text-gray-400">${data}</div>`
       }
       if (!data || !data.sources || data.sources.length === 0) {
-        return `<div class="p-4 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-400">No sources found.</div>`
+        return `<div class="p-3 rounded-md bg-gray-50 dark:bg-slate-800/60 text-sm text-gray-600 dark:text-gray-400">No sources found.</div>`
       }
 
       const defaultCols = ["id", "name", "info", "url", "location"]
       const headers = data.sources[0] ? Object.keys(data.sources[0]).filter((k) => defaultCols.includes(k)) : []
-
-      // Special handling for HomeKit table to add action buttons
       const isHomeKitTable = sourceId === "homekit"
-      if (isHomeKitTable && headers.length > 0 && !headers.includes("actions")) {
-        // headers.push('actions'); // We'll add actions inline for HomeKit
-      }
 
       let thead = "<tr>"
       headers.forEach(
         (h) =>
-          (thead += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">${h}</th>`),
+          (thead += `<th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">${h}</th>`),
       )
       if (isHomeKitTable)
-        thead += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>`
+        thead += `<th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>`
       thead += "</tr>"
 
       let tbody = ""
       data.sources.forEach((row) => {
-        tbody += '<tr class="hover:bg-gray-50 dark:hover:bg-slate-800/50">'
+        tbody += '<tr class="hover:bg-gray-50/70 dark:hover:bg-slate-800/40">'
         headers.forEach((h) => {
-          tbody += `<td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-800 dark:text-gray-200">${row[h] || ""}</td>`
+          tbody += `<td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-800 dark:text-gray-200">${row[h] || ""}</td>`
         })
         if (isHomeKitTable) {
           let commands = ""
           if (row.info && row.info.indexOf("status=1") > -1) {
-            // Assuming 'info' contains status
-            commands += `<button @click="$dispatch('populate-homekit-pair', { id: '${row.id}', url: '${row.info}' })" class="py-1 px-2 text-xs font-medium rounded-lg border border-transparent bg-blue-500 text-white hover:bg-blue-600">Pair</button>`
+            commands += `<button @click="$dispatch('populate-homekit-pair', { id: '${row.id}', url: '${row.info}' })" class="py-1.5 px-2.5 text-xs font-medium rounded-md border border-transparent bg-blue-500 text-white hover:bg-blue-600">Pair</button>`
           } else if (row.url) {
-            // Assuming 'url' indicates a paired device that can be unpaired
-            commands += `<button @click="$dispatch('populate-homekit-unpair', { id: '${row.url}' })" class="py-1 px-2 text-xs font-medium rounded-lg border border-transparent bg-red-500 text-white hover:bg-red-600 ml-1">Unpair</button>`
+            commands += `<button @click="$dispatch('populate-homekit-unpair', { id: '${row.url}' })" class="py-1.5 px-2.5 text-xs font-medium rounded-md border border-transparent bg-red-500 text-white hover:bg-red-600 ml-1">Unpair</button>`
           }
-          tbody += `<td class="px-6 py-4 whitespace-nowrap text-sm">${commands}</td>`
+          tbody += `<td class="px-4 py-3 whitespace-nowrap text-sm">${commands}</td>`
         }
         tbody += "</tr>"
       })
 
-      return `<div class="overflow-x-auto -mx-1 sm:-mx-2 lg:-mx-4"><div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                <div class="overflow-hidden border border-gray-200 dark:border-gray-700 sm:rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-slate-800">${thead}</thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-slate-900">${tbody}</tbody>
+      return `<div class="overflow-x-auto -mx-1 sm:-mx-2 lg:-mx-3"><div class="inline-block min-w-full py-2 align-middle sm:px-1 lg:px-2">
+                <div class="overflow-hidden border border-gray-200 dark:border-gray-700/80 sm:rounded-md">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700/80">
+                        <thead class="bg-gray-50 dark:bg-slate-800/60">${thead}</thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700/80 bg-white dark:bg-slate-900/70">${tbody}</tbody>
                     </table>
                 </div></div></div>`
     },
@@ -164,7 +157,7 @@ function addStreamState() {
     async addTemporaryStream() {
       const { name, src } = this.forms.stream
       if (!name || !src) {
-        alert("Please provide both a name and a URL.") // Consider Preline Toasts/Modals later
+        alert("Please provide both a name and a URL.")
         return
       }
       const url = new URL("api/streams", location.href)
@@ -238,13 +231,10 @@ function addStreamState() {
       }
     },
 
-    // Listener for populating HomeKit forms from table actions
     initHomekitFormPopulators() {
       this.$watch("activeSource", (value) => {
-        // Ensure this runs in Alpine context
         if (value === "homekit") {
           this.$nextTick(() => {
-            // Wait for table to render
             this._homekitPairListener = (event) => {
               this.forms.homekit.pair.id = event.detail.id
               this.forms.homekit.pair.url = event.detail.url
@@ -287,7 +277,7 @@ function addStreamState() {
         const r = await fetch(url, { cache: "no-cache" })
         await this.getSources("nest", r)
       } catch (error) {
-        this.tables.nest = `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">Failed to login. See console for details.</p>`
+        this.tables.nest = `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">Failed to login. See console for details.</p>`
         console.error(error)
       }
     },
@@ -300,7 +290,7 @@ function addStreamState() {
       }
 
       const query = new URLSearchParams({ email, password })
-      if (this.forms.ring.show2FA && code) query.set("code", code) // Only add code if 2FA is shown and code is entered
+      if (this.forms.ring.show2FA && code) query.set("code", code)
 
       const url = new URL("api/ring?" + query.toString(), location.href)
 
@@ -315,16 +305,16 @@ function addStreamState() {
         }
 
         if (!r.ok) {
-          this.tables.ring = `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">${data.error || "Unknown error"}</p>`
+          this.tables.ring = `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">${data.error || "Unknown error"}</p>`
           return
         }
 
         this.tables.ring = data
-        this.forms.ring.show2FA = false // Reset 2FA on success
+        this.forms.ring.show2FA = false
         this.forms.ring.tfaPrompt = ""
-        this.forms.ring.credentials.code = "" // Clear 2FA code
+        this.forms.ring.credentials.code = ""
       } catch (error) {
-        this.tables.ring = `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">Failed to login. See console for details.</p>`
+        this.tables.ring = `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">Failed to login. See console for details.</p>`
         console.error(error)
       }
     },
@@ -344,12 +334,12 @@ function addStreamState() {
         const data = await r.json()
 
         if (!r.ok) {
-          this.tables.ring = `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">${data.error || "Unknown error"}</p>`
+          this.tables.ring = `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">${data.error || "Unknown error"}</p>`
           return
         }
         this.tables.ring = data
       } catch (error) {
-        this.tables.ring = `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">Failed to login. See console for details.</p>`
+        this.tables.ring = `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">Failed to login. See console for details.</p>`
         console.error(error)
       }
     },
@@ -369,15 +359,21 @@ function addStreamState() {
         const r = await fetch("api/roborock", { method: "POST", body: body })
         await this.getSources("roborock", r)
       } catch (error) {
-        this.tables.roborock = `<p class="text-red-600 dark:text-red-500 p-4 bg-red-100 dark:bg-red-500/10 rounded-lg">Failed to login. See console for details.</p>`
+        this.tables.roborock = `<p class="text-sm text-red-600 dark:text-red-500 p-3 bg-red-100 dark:bg-red-500/10 rounded-md">Failed to login. See console for details.</p>`
         console.error(error)
       }
     },
 
-    // Call this in init if you want HomeKit form populators
     init() {
       this.initHomekitFormPopulators()
-      // ... other init logic
+      // Initial load for the default active source if it's a simple one
+      const defaultSource = this.sources.find((s) => s.id === this.activeSource)
+      const simpleSources = ["alsa", "dvrip", "devices", "hardware", "gopro", "hass", "v4l2", "webtorrent"]
+      if (defaultSource && simpleSources.includes(defaultSource.id)) {
+        this.getSources(defaultSource.id, `api/${defaultSource.id}`)
+      } else if (defaultSource && defaultSource.id === "onvif") {
+        this.getSources("onvif", "api/onvif")
+      }
     },
   }
 }

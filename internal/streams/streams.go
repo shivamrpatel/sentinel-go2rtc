@@ -1,9 +1,13 @@
 package streams
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,26 +16,108 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	BackendURL     = "https://api.joinsentinel.com"
+	MediaServerURL = "rtmp://media.joinsentinel.com/"
+)
+
+// createCamera saves the camera configuration to the backend API
+func createCamera(streamName string, apiKey string) (string, error) {
+	payload := map[string]any{
+		"name": streamName,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", BackendURL+"/cameras/agent", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", errors.New("failed to save camera config: " + resp.Status)
+	}
+
+	var response struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", err
+	}
+
+	return response.ID, nil
+}
+
+
+func registerAPIKey(apiKey string) error {
+	payload := map[string]any{
+		"api_key": apiKey,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", BackendURL+"/agents/", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Error().Err(err).Msgf("[streams] failed to register API key with status: %s", resp.Status)
+		return errors.New("failed to register API key: " + resp.Status)
+	}
+
+	return nil
+}
+
 func Init() {
 	var cfg struct {
-		Streams map[string]any `yaml:"streams"`
-		Publish map[string]any `yaml:"publish"`
+		Streams map[string]map[string]any `yaml:"streams"`
+		Publish map[string]any            `yaml:"publish"`
+		ApiKey  string                    `yaml:"api_key"`
 	}
 
 	app.LoadConfig(&cfg)
 
-	log = app.GetLogger("streams")
+	if err := registerAPIKey(cfg.ApiKey); err != nil {
+		log.Fatal().Err(err).Msg("[streams] failed to register API key")
+		return
+	}
 
+	log = app.GetLogger("streams")
 	for name, item := range cfg.Streams {
-		streams[name] = NewStream(item)
+		stream := NewStream(item)
+		// Set the YAML key as stream ID 
+		stream.ID = name
+		streams[name] = stream
 	}
 
 	api.HandleFunc("api/streams", apiStreams)
 	api.HandleFunc("api/streams.dot", apiStreamsDOT)
-
-	if cfg.Publish == nil {
-		return
-	}
 
 	time.AfterFunc(time.Second, func() {
 		for name, dst := range cfg.Publish {
@@ -40,6 +126,14 @@ func Init() {
 			}
 		}
 	})
+
+	// time.AfterFunc(time.Second, func() {
+	// 	for name := range cfg.Streams {
+	// 		if stream := Get(name); stream != nil {
+	// 			Publish(stream, []any{MediaServerURL + stream.ID})
+	// 		}
+	// 	}
+	// })
 }
 
 var sanitize = regexp.MustCompile(`\s`)
@@ -53,18 +147,44 @@ func Validate(source string) error {
 }
 
 func New(name string, sources ...string) *Stream {
+
+	var cfg struct {
+		ApiKey string `yaml:"api_key"`
+	}
+
+	app.LoadConfig(&cfg)
+
 	for _, source := range sources {
 		if Validate(source) != nil {
 			return nil
 		}
 	}
 
-	stream := NewStream(sources)
+	var new_cam_id string
+	if id, err := createCamera(name, cfg.ApiKey); err != nil {
+		log.Error().Err(err).Msgf("[streams] failed to save camera config for stream %s", name)
+		return nil
+	} else {
+		log.Info().Str("camera_id", id).Msgf("[streams] saved camera config for stream %s", name)
+		new_cam_id = id
+	}
+	new_cam_id = strings.ReplaceAll(new_cam_id, "-", "")
+
+	sourceMap := map[string]any{
+		"url": sources,
+		"id":  new_cam_id,
+	}
+	stream := NewStream(sourceMap)
+	// Ensure the stream uses the processed camera ID
+	stream.ID = new_cam_id
 
 	streamsMu.Lock()
 	streams[name] = stream
 	streamsMu.Unlock()
 
+	if stream := Get(name); stream != nil {
+		Publish(stream, []any{MediaServerURL + stream.ID})
+	}
 	return stream
 }
 
@@ -109,6 +229,8 @@ func Patch(name string, source string) *Stream {
 
 	// create new stream with this name
 	stream := NewStream(source)
+	// Set the stream name as ID
+	stream.ID = name
 	streams[name] = stream
 	return stream
 }

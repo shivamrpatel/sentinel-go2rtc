@@ -25,6 +25,7 @@ func (s *Stream) Publish(url string) error {
 }
 
 func Publish(stream *Stream, destination any) {
+	log.Info().Interface("destination", destination).Msg("[streams] publishing stream to destination")
 	switch v := destination.(type) {
 	case string:
 		if err := stream.Publish(v); err != nil {

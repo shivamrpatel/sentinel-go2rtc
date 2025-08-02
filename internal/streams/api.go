@@ -53,7 +53,21 @@ func apiStreams(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := app.PatchConfig([]string{"streams", name}, query["src"]); err != nil {
+		stream := Get(name)
+		if stream == nil {
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		// Save stream config with id, name, and url as array
+		streamConfig := map[string]any{
+			"id":  stream.ID,
+			"url": query["src"],
+		}
+		if stream.Name != "" {
+			streamConfig["name"] = stream.Name
+		}
+		if err := app.PatchConfig([]string{"streams", name}, streamConfig); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 
@@ -67,6 +81,25 @@ func apiStreams(w http.ResponseWriter, r *http.Request) {
 		// support {input} templates: https://github.com/AlexxIT/go2rtc#module-hass
 		if Patch(name, src) == nil {
 			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+
+		stream := Get(name)
+		if stream == nil {
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		// Save stream config with id, name, and url as array
+		streamConfig := map[string]any{
+			"id":  stream.ID,
+			"url": []string{src},
+		}
+		if stream.Name != "" {
+			streamConfig["name"] = stream.Name
+		}
+		if err := app.PatchConfig([]string{"streams", name}, streamConfig); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 
 	case "POST":

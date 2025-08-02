@@ -25,6 +25,8 @@ import (
 	"github.com/AlexxIT/go2rtc/internal/mjpeg"
 	"github.com/AlexxIT/go2rtc/internal/mp4"
 	"github.com/AlexxIT/go2rtc/internal/mpegts"
+	"github.com/AlexxIT/go2rtc/internal/motion"
+	"github.com/AlexxIT/go2rtc/internal/mqtt"
 	"github.com/AlexxIT/go2rtc/internal/nest"
 	"github.com/AlexxIT/go2rtc/internal/ngrok"
 	"github.com/AlexxIT/go2rtc/internal/onvif"
@@ -49,9 +51,11 @@ func main() {
 
 	app.Init() // init config and logs
 
-	api.Init() // init API before all others
-	ws.Init()  // init WS API endpoint
+	api.Init()  // init API before all others
+	ws.Init()   // init WS API endpoint
+	mqtt.Init() // init MQTT client
 
+	motion.Init() // motion detection module (must be before streams)
 	streams.Init() // streams module
 
 	// 2. Main sources and servers

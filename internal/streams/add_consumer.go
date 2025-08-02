@@ -17,8 +17,10 @@ func (s *Stream) AddConsumer(cons core.Consumer) (err error) {
 
 	// Step 1. Get consumer medias
 	consMedias := cons.GetMedias()
+	log.Debug().Int("num_producers", len(s.producers)).Int("num_consumer_medias", len(consMedias)).Msg("[streams] AddConsumer start")
+	
 	for _, consMedia := range consMedias {
-		log.Trace().Msgf("[streams] check cons=%d media=%s", consN, consMedia)
+		log.Debug().Msgf("[streams] check cons=%d media=%s", consN, consMedia)
 
 	producers:
 		for prodN, prod := range s.producers {
@@ -33,11 +35,13 @@ func (s *Stream) AddConsumer(cons core.Consumer) (err error) {
 				continue
 			}
 
+			log.Debug().Str("producer_url", prod.url).Msgf("[streams] attempting to dial producer %d for consumer %d", prodN, consN)
 			if err = prod.Dial(); err != nil {
-				log.Trace().Err(err).Msgf("[streams] dial cons=%d prod=%d", consN, prodN)
+				log.Debug().Err(err).Str("producer_url", prod.url).Msgf("[streams] dial failed cons=%d prod=%d", consN, prodN)
 				prodErrors[prodN] = err
 				continue
 			}
+			log.Debug().Str("producer_url", prod.url).Msgf("[streams] dial successful cons=%d prod=%d", consN, prodN)
 
 			// Step 2. Get producer medias (not tracks yet)
 			for _, prodMedia := range prod.GetMedias() {

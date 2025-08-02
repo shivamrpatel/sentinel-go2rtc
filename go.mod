@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.24.4
 
 require (
+	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/expr-lang/expr v1.17.5
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -23,6 +24,7 @@ require (
 	github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f
 	github.com/stretchr/testify v1.10.0
 	github.com/tadglines/go-pkgs v0.0.0-20210623144937-b983b20f54f9
+	gocv.io/x/gocv v0.35.0
 	golang.org/x/crypto v0.39.0
 	gopkg.in/yaml.v3 v3.0.1
 )
